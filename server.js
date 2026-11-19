@@ -98,7 +98,7 @@ app.post('/api/user', async (req, res) => {
 
         // User.create valida contra el Schema (name y email son required)
         // y guarda el documento en la base de datos
-        const newUser = await User.create({ name: user.name, email: user.email })
+        const newUser = await User.create({ name: user.name, email: user.email, password: user.password })
 
         // 201 = Created (recurso creado con éxito)
         res.status(201).json({ message: "OK user Created", newUser })
