@@ -4,6 +4,7 @@ import cors from "cors"
 import mongoose from "mongoose"
 import 'dotenv/config';
 import { User } from "./models/User.js";
+import bcrypt from "bcryptjs"
 
 const app = express()
 
@@ -19,8 +20,9 @@ app.use(express.json())    // Convierte el body que llega en JSON a un objeto JS
 // RUTA RAÍZ - solo para probar que la API responde
 // ======================================================
 app.get('/', (req, res) => {
+    console.log('ENTRO POR ACA')
     const message = "Hola desde la ruta raiz / "
-    res.json({ message })
+    res.status(200).json({ message, ok: true })
 })
 
 // ======================================================
@@ -156,6 +158,25 @@ app.delete('/api/user/:id', async (req, res) => {
     } catch (error) {
         res.status(400).json({ message: "Error al eliminar el usuario", error: error.message })
     }
+})
+
+app.post('/api/auth/register', async (req, res) => {
+
+    try {
+
+        const { name, email, password } = req.body;
+
+        console.log(req.body)
+        const newUser = await User.create({ name: name, email: email, password: password })
+
+        // 201 = Created (recurso creado con éxito)
+        res.status(201).json({ message: "OK user Created", newUser })
+
+    } catch (error) {
+        res.status(400).json({ message: "Error al registrar usuario", error: error.message })
+
+    }
+
 })
 
 
