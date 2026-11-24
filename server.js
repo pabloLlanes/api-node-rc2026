@@ -179,6 +179,40 @@ app.post('/api/auth/register', async (req, res) => {
 
 })
 
+app.post('/api/auth/login', async (req, res) => {
+    try {
+        const { email, password } = req.body
+
+        const user = await User.findOne({ email: email })
+
+        if (!user) {
+            return res.status(400).json({ message: "Email o password incorrectos" })
+        }
+
+        console.log("password de la db: ", user.password)
+        console.log("password q mando el cliente: ", password)
+
+        const passwordOK = await bcrypt.compare(password, user.password)
+
+        console.log(passwordOK)
+
+        if (!passwordOK) {
+            // 401 = Unauthorized
+            return res.status(401).json({ message: "Email o password incorrectos" })
+        }
+
+        res.status(200).json({
+            message: "Login correcto",
+            user: { id: user._id, name: user.name, email: user.email }
+        })
+
+    } catch (error) {
+        res.status(400).json({ message: "Error al realizar el inicio de sesión", error: error.message })
+
+    }
+
+})
+
 
 // ======================================================
 // CONEXIÓN A MONGODB Y ARRANQUE DEL SERVIDOR
