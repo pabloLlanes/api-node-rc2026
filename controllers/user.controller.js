@@ -1,4 +1,5 @@
 import { User } from "../models/User.js";
+import { Product } from "../models/Product.js";
 
 // READ (todos) - GET /api/users
 export const getUsers = async (req, res) => {
@@ -15,7 +16,8 @@ export const getUsers = async (req, res) => {
 export const getUserById = async (req, res) => {
     try {
         const { id } = req.params
-        const user = await User.findById(id).select('-password')
+        // populate('products') -> cambia el array de ObjectIds por los productos completos
+        const user = await User.findById(id).select('-password').populate('products')
 
         if (!user) {
             return res.status(404).json({ message: "Usuario no encontrado" })
@@ -73,6 +75,9 @@ export const deleteUser = async (req, res) => {
         if (!deletedUser) {
             return res.status(404).json({ message: "Usuario no encontrado" })
         }
+
+        // Si se borra el usuario, se borran también sus productos (si no, quedarían "huérfanos")
+        await Product.deleteMany({ owner: id })
 
         res.status(200).json({ message: "OK user Deleted", deletedUser })
     } catch (error) {

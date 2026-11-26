@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prueba JWT + localStorage</title>
+    <style>
+        body { font-family: sans-serif; max-width: 700px; margin: 20px auto; padding: 0 16px; }
+        section { border: 1px solid #ccc; border-radius: 8px; padding: 12px; margin-bottom: 16px; }
+        input, button { padding: 6px; margin: 4px 0; }
+        pre { background: #f4f4f4; padding: 8px; overflow-x: auto; }
+        .oculto { display: none; }
+    </style>
+</head>
+<body>
+    <h1>Prueba JWT + localStorage</h1>
+
+    <!-- 1) REGISTER -->
+    <section id="seccionRegister">
+        <h2>Registrarse</h2>
+        <form id="formRegister">
+            <input name="name" placeholder="Nombre" required>
+            <input name="email" type="email" placeholder="Email" required>
+            <input name="password" type="password" placeholder="Password" required>
+            <button>Registrarme</button>
+        </form>
+    </section>
+
+    <!-- 2) LOGIN -->
+    <section id="seccionLogin">
+        <h2>Login</h2>
+        <form id="formLogin">
+            <input name="email" type="email" placeholder="Email" required>
+            <input name="password" type="password" placeholder="Password" required>
+            <button>Entrar</button>
+        </form>
+    </section>
+
+    <!-- 3) USUARIO LOGUEADO -->
+    <section id="seccionUsuario" class="oculto">
+        <h2>Hola, <span id="nombreUsuario"></span> 👋</h2>
+        <button id="btnLogout">Cerrar sesión</button>
+    </section>
+
+    <!-- 4) PRODUCTOS -->
+    <section>
+        <h2>Productos</h2>
+        <form id="formProducto" class="oculto">
+            <input name="name" placeholder="Nombre" required>
+            <input name="price" type="number" placeholder="Precio" required>
+            <input name="stock" type="number" placeholder="Stock">
+            <button>Crear producto (necesita token)</button>
+        </form>
+        <ul id="listaProductos"></ul>
+    </section>
+
+    <h3>Última respuesta del servidor</h3>
+    <pre id="respuesta"></pre>
+
+    <script>
+        // URL de la API (el puerto es el PORT del .env). Funciona gracias a app.use(cors()) en server.js
+        const API = 'http://localhost:5000/api'
+
+        // ======================================================
+        // PASO 1 - HELPERS DE LOCALSTORAGE
+        // localStorage guarda SOLO strings: el user va con JSON.stringify / JSON.parse
+        // ======================================================
+        const guardarSesion = (token, user) => {
+            localStorage.setItem('token', token)
+            localStorage.setItem('user', JSON.stringify(user))
+        }
+        const obtenerToken = () => localStorage.getItem('token')
+        const obtenerUsuario = () => JSON.parse(localStorage.getItem('user'))
+        const borrarSesion = () => {
+            localStorage.removeItem('token')
+            localStorage.removeItem('user')
+        }
+
+        const mostrar = (data) => {
+            document.getElementById('respuesta').textContent = JSON.stringify(data, null, 2)
+        }
+
+        // ======================================================
+        // PASO 2 - FETCH CON TOKEN
+        // Si hay token, lo manda en el header  Authorization: Bearer <token>
+        // ======================================================
+        const fetchConToken = async (url, opciones = {}) => {
+            const token = obtenerToken()
+            const headers = { 'Content-Type': 'application/json' }
+            if (token) {
+                headers.Authorization = `Bearer ${token}`
+            }
+
+            const res = await fetch(url, { ...opciones, headers })
+            const data = await res.json()
+
+            // 401 = el token no sirve (venció o es inválido): cerramos sesión
+            if (res.status === 401 && token) {
+                borrarSesion()
+                actualizarPantalla()
+            }
+            return data
+        }
+
+        // ======================================================
+        // PASO 3 - MOSTRAR / OCULTAR SEGÚN SI HAY SESIÓN
+        // ======================================================
+        const actualizarPantalla = () => {
+            const user = obtenerUsuario()
+            const logueado = !!obtenerToken()
+
+            document.getElementById('seccionLogin').classList.toggle('oculto', logueado)
+            document.getElementById('seccionRegister').classList.toggle('oculto', logueado)
+            document.getElementById('seccionUsuario').classList.toggle('oculto', !logueado)
+            document.getElementById('formProducto').classList.toggle('oculto', !logueado)
+            document.getElementById('nombreUsuario').textContent = user ? user.name : ''
+        }
+
+        // REGISTER
+        document.getElementById('formRegister').addEventListener('submit', async (e) => {
+            e.preventDefault()
+            const body = Object.fromEntries(new FormData(e.target))
+            const data = await fetchConToken(`${API}/auth/register`, { method: 'POST', body: JSON.stringify(body) })
+            mostrar(data)
+            e.target.reset()
+        })
+
+        // ======================================================
+        // PASO 4 - LOGIN: guarda token y usuario en localStorage
+        // ======================================================
+        document.getElementById('formLogin').addEventListener('submit', async (e) => {
+            e.preventDefault()
+            const body = Object.fromEntries(new FormData(e.target))
+            const data = await fetchConToken(`${API}/auth/login`, { method: 'POST', body: JSON.stringify(body) })
+            mostrar(data)
+
+            if (data.token) {
+                guardarSesion(data.token, data.user)
+                actualizarPantalla()
+                e.target.reset()
+            }
+        })
+
+        // ======================================================
+        // PASO 5 - LOGOUT: con JWT el logout es solo borrar el token
+        // ======================================================
+        document.getElementById('btnLogout').addEventListener('click', () => {
+            borrarSesion()
+            actualizarPantalla()
+            mostrar({ message: 'Sesión cerrada (token borrado de localStorage)' })
+        })
+
+        // PRODUCTOS
+        const cargarProductos = async () => {
+            const data = await fetchConToken(`${API}/products`)
+            const lista = document.getElementById('listaProductos')
+            lista.innerHTML = ''
+            data.products.forEach((p) => {
+                const li = document.createElement('li')
+                // p.owner viene "populado" desde el back: { _id, name, email }
+                const dueño = p.owner ? p.owner.name : 'sin dueño'
+                li.textContent = `${p.name} - $${p.price} (stock: ${p.stock}) · de ${dueño} `
+
+                const btnBorrar = document.createElement('button')
+                btnBorrar.textContent = 'Borrar'
+                btnBorrar.addEventListener('click', async () => {
+                    mostrar(await fetchConToken(`${API}/product/${p._id}`, { method: 'DELETE' }))
+                    cargarProductos()
+                })
+
+                li.appendChild(btnBorrar)
+                lista.appendChild(li)
+            })
+        }
+
+        document.getElementById('formProducto').addEventListener('submit', async (e) => {
+            e.preventDefault()
+            const body = Object.fromEntries(new FormData(e.target))
+            const data = await fetchConToken(`${API}/product`, { method: 'POST', body: JSON.stringify(body) })
+            mostrar(data)
+            e.target.reset()
+            cargarProductos()
+        })
+
+        // Al abrir la página: si ya había token en localStorage, seguimos logueados
+        actualizarPantalla()
+        cargarProductos()
+    </script>
+</body>
+</html>

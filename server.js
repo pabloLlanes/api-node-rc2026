@@ -3,10 +3,10 @@ import morgan from "morgan"
 import cors from "cors"
 import mongoose from "mongoose"
 import 'dotenv/config';
-import { User } from "./models/User.js";
-import bcrypt from "bcryptjs"
 
 import userRoutes from "./routes/user.routes.js";
+import productRoutes from "./routes/product.routes.js";
+import authRoutes from "./routes/auth.routes.js";
 
 const app = express()
 
@@ -28,62 +28,9 @@ app.get('/', (req, res) => {
 })
 
 app.use('/api', userRoutes)
+app.use('/api', productRoutes)
+app.use('/api', authRoutes)
 
-
-
-// faltan migrar
-app.post('/api/auth/register', async (req, res) => {
-
-    try {
-
-        const { name, email, password } = req.body;
-
-        console.log(req.body)
-        const newUser = await User.create({ name: name, email: email, password: password })
-
-        // 201 = Created (recurso creado con éxito)
-        res.status(201).json({ message: "OK user Created", newUser })
-
-    } catch (error) {
-        res.status(400).json({ message: "Error al registrar usuario", error: error.message })
-
-    }
-
-})
-
-app.post('/api/auth/login', async (req, res) => {
-    try {
-        const { email, password } = req.body
-
-        const user = await User.findOne({ email: email })
-
-        if (!user) {
-            return res.status(400).json({ message: "Email o password incorrectos" })
-        }
-
-        console.log("password de la db: ", user.password)
-        console.log("password q mando el cliente: ", password)
-
-        const passwordOK = await bcrypt.compare(password, user.password)
-
-        console.log(passwordOK)
-
-        if (!passwordOK) {
-            // 401 = Unauthorized
-            return res.status(401).json({ message: "Email o password incorrectos" })
-        }
-
-        res.status(200).json({
-            message: "Login correcto",
-            user: { id: user._id, name: user.name, email: user.email }
-        })
-
-    } catch (error) {
-        res.status(400).json({ message: "Error al realizar el inicio de sesión", error: error.message })
-
-    }
-
-})
 
 
 // ======================================================
