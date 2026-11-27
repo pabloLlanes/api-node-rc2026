@@ -1,12 +1,14 @@
 import express from "express"
 import morgan from "morgan"
 import cors from "cors"
-import mongoose from "mongoose"
 import 'dotenv/config';
+import { connectDB } from "./config/db.js";
+import { startServer } from "./config/server.js";
 
 import userRoutes from "./routes/user.routes.js";
 import productRoutes from "./routes/product.routes.js";
 import authRoutes from "./routes/auth.routes.js";
+import orderRoutes from "./routes/order.routes.js";
 
 const app = express()
 
@@ -27,25 +29,30 @@ app.get('/', (req, res) => {
     res.status(200).json({ message, ok: true })
 })
 
-app.use('/api', userRoutes)
-app.use('/api', productRoutes)
-app.use('/api', authRoutes)
-
-
+// ======================================================
+// RUTAS DE LA API
+// Cada archivo de rutas se "monta" bajo el prefijo /api.
+// ======================================================
+app.use('/api', userRoutes)     // /api/users, /api/user/:id
+app.use('/api', productRoutes)  // /api/products, /api/product/:id
+app.use('/api', authRoutes)     // /api/auth/register, /api/auth/login
+app.use('/api', orderRoutes)    // /api/orders, /api/order/:id
 
 // ======================================================
 // CONEXIÓN A MONGODB Y ARRANQUE DEL SERVIDOR
 // Primero nos conectamos a la base de datos y, solo si
 // sale bien, levantamos el servidor en el puerto del .env
+// (connectDB vive en config/db.js y startServer en config/server.js)
 // ======================================================
-try {
-    await mongoose.connect(process.env.MONGO_URI);
-    console.log('✅ Conectado a MongoDB');
-
-    app.listen(process.env.PORT, () => {
-        console.log(`✅ Api corriendo en el puerto ${process.env.PORT}`)
-    });
-} catch (error) {
-    console.error('❌ No se pudo conectar a MongoDB:', error.message);
+const main = async () => {
+    try {
+        await connectDB();
+        startServer(app);
+    } catch (error) {
+        console.error('❌ No se pudo conectar a MongoDB:', error.message);
+        process.exit(1); // cortamos el proceso: sin DB la API no sirve
+    }
 }
+
+main();
 

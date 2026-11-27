@@ -27,17 +27,29 @@ export const getProductById = async (req, res) => {
     }
 }
 
-// CREATE - POST /api/product  (🔒 protegida: req.user lo carga verifyToken)
+// CREATE - POST /api/product
 export const createProduct = async (req, res) => {
     try {
-        const { name, description, price, stock, image } = req.body
+        const { name, description, price, stock, image, owner } = req.body
 
-        // 1) Creamos el producto con el dueño = usuario del token
-        const newProduct = await Product.create({ name, description, price, stock, image, owner: req.user.id })
+        // ¿Quién es el dueño?
+        // - Con verifyToken en la ruta -> sale del token (req.user.id). Es lo SEGURO.
+        // - Sin verifyToken            -> sale del body ("owner"). Sirve para probar, pero
+        //   cualquiera podría crear productos a nombre de otro.
+        const ownerId = req.user ? req.user.id : owner
 
-        // 2) Agregamos el _id del producto al array "products" del usuario
+        // 1) Verificamos que el dueño exista
+        const user = await User.findById(ownerId)
+        if (!user) {
+            return res.status(404).json({ message: "Usuario (owner) no encontrado" })
+        }
+
+        // 2) Creamos el producto con su dueño
+        const newProduct = await Product.create({ name, description, price, stock, image, owner: ownerId })
+
+        // 3) Agregamos el _id del producto al array "products" del usuario
         //    $push -> agrega un elemento al array
-        await User.findByIdAndUpdate(req.user.id, { $push: { products: newProduct._id } })
+        await User.findByIdAndUpdate(ownerId, { $push: { products: newProduct._id } })
 
         res.status(201).json({ message: "OK product Created", newProduct })
     } catch (error) {

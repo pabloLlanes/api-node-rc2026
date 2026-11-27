@@ -4,7 +4,7 @@ import { User } from "../models/User.js";
 
 // Cuánto dura el token. Pasado este tiempo jwt.verify lo rechaza y hay que volver a loguearse.
 // Formatos válidos: '60s', '15m', '2h', '7d'
-const JWT_EXPIRES_IN = '2h'
+const JWT_EXPIRES_IN = '356d'
 
 // POST /api/auth/register
 export const register = async (req, res) => {
@@ -30,25 +30,28 @@ export const login = async (req, res) => {
 
         // 1) Buscamos al usuario por email
         const user = await User.findOne({ email })
+
+        const errorMessage = "Email o password incorrectos"
+
         if (!user) {
-            return res.status(401).json({ message: "Email o password incorrectos" })
+            return res.status(401).json({ message: errorMessage })
         }
 
         // 2) Comparamos la password que manda el cliente con el hash de la DB
         const passwordOK = await bcrypt.compare(password, user.password)
         if (!passwordOK) {
-            return res.status(401).json({ message: "Email o password incorrectos" })
+            return res.status(401).json({ message: errorMessage })
         }
 
         // 3) Creamos el token. El payload NO está encriptado: nunca poner la password
         const payload = { id: user._id, name: user.name, email: user.email }
         // jwt.sign(payload, clave secreta, opciones) -> devuelve el token (un string)
-        const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: JWT_EXPIRES_IN })
+        const jwtToken = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: JWT_EXPIRES_IN })
 
         // 4) Se lo mandamos al cliente (el frontend lo guarda en localStorage)
         res.status(200).json({
             message: "Login correcto",
-            token,
+            token: jwtToken,
             user: { id: user._id, name: user.name, email: user.email }
         })
     } catch (error) {
